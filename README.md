@@ -55,3 +55,11 @@ The following options are needed for the baselines:
 
 - `--time_aware` set to `no` for time-unaware models, or `input` for using the interval width as input feature in a fixed-width scheme.
 - `--model` set to `GRU`, `GRUinc`, `ARNN`, or `ARNNinc`, with `ARNN` for the anti-symmetric RNN, and `inc` for the incremental (non-stationary) schemes.
+
+## HomeRLer's version
+
+To deploy this model to BlueROV2 robot system identification, We modified the `winding/main.py` programme, and modified the way of loading data to load our own datasets.
+
+The "Original Version of loading data" is original way of this repo, and "HomeRLer's Version" is ours.
+
+- [ ] TODO: Try to cascade different data from separate csv files and train the model in a larger dataset.
