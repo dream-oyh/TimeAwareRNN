@@ -1,0 +1,56 @@
+#logger output
+Args: Namespace(time_aware='variable', model='GRU', interpol='constant', gamma=1.0, step_size=1.0, missing=0.0, k_state=20, scheme='Euler', batch_size=16, epochs=1000, lr=0.001, bptt=20, dropout=0.0, l2=0.0, save='results', eval_epochs=20, seed=0, reset=False)
+Using GPU? True
+loaded data, 
+X (2000, 13) 
+Y (2000, 3) 
+t (2000, 1) 
+dt (2000, 1) 
+time intervals dt between 0.100 and 0.100 wide (0.100 on average).
+first 1400 for training, then 300 for development and 300 for testing
+
+Model GRU (time_aware: variable, scheme Euler) with 2820 trainable parameters
+Architecture:  MIMO(
+  (criterion): MSELoss()
+  (cell): HOGRUCell(
+    (expand_input): Sequential(
+      (0): Linear(in_features=13, out_features=20, bias=True)
+      (1): Tanh()
+    )
+    (Lx): Linear(in_features=20, out_features=60, bias=False)
+    (Lh_gate): Linear(in_features=20, out_features=40, bias=True)
+    (Lh_lin): Linear(in_features=20, out_features=20, bias=True)
+    (Ly): Linear(in_features=20, out_features=3, bias=False)
+    (dropout): Dropout(p=0.0, inplace=False)
+  )
+)
+epoch 0020 | loss 0.003 (train), 0.003 (dev) | error 5.782 (train), 11.712 (dev) | tt 1.62min
+new best dev error 11.712
+epoch 0040 | loss 0.002 (train), 0.004 (dev) | error 5.117 (train), 12.122 (dev) | tt 3.02min
+Traceback (most recent call last):
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\winding\main.py", line 303, in <module>
+    mse_train = trainer(epoch)
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\taho\train.py", line 99, in __call__
+    Y_pred, _ = self.model(X, state0=state0, dt=dt)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\taho\model.py", line 301, in forward
+    output, state = self.cell(x0, state, dt=dt_i, x_half=x_half, x_full=x_full)  # output (batch, 2)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\taho\model.py", line 127, in forward
+    state_new = self.dropout(RK(self.expand_input(x), state, self.f, dt, scheme, x_half=x_half, x_full=x_full))  # (batch, k_gru)
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\taho\model.py", line 14, in RK
+    incr = dt * f(x0, y)
+  File "c:\Users\13995\Desktop\Bluerov2_trajectory_dataset\TimeAwareRNN\taho\model.py", line 134, in f
+    Lx = self.Lx(x)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "D:\miniconda\torch_env\lib\site-packages\torch\nn\modules\module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+KeyboardInterrupt
+

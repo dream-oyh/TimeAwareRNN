@@ -1,24 +1,34 @@
 import os
 import sys
-import numpy as np
 from time import time
+
+import numpy as np
 import torch
+
 GPU = torch.cuda.is_available()
 
 parent = os.path.dirname(sys.path[0])#os.getcwd())
 sys.path.append(parent)
-from taho.model import MIMO, GRUCell, HOGRUCell, IncrHOGRUCell, HOARNNCell, IncrHOARNNCell
-from taho.train import EpochTrainer
-from taho.util import SimpleLogger, show_data
-
-from tensorboard_logger import configure, log_value
 import argparse
 import os
 import pickle
+import shutil
 import sys
 import traceback
-import shutil
 
+import pandas as pd
+from tensorboard_logger import configure, log_value
+
+from taho.model import (
+    MIMO,
+    GRUCell,
+    HOARNNCell,
+    HOGRUCell,
+    IncrHOARNNCell,
+    IncrHOGRUCell,
+)
+from taho.train import EpochTrainer
+from taho.util import SimpleLogger, show_data
 
 """
 potentially varying input parameters
@@ -57,8 +67,8 @@ RKchoices = ['Euler', 'Midpoint', 'Kutta3', 'RK4']
 parser.add_argument("--scheme", type=str, default='Euler', choices=RKchoices, help='Runge-Kutta training scheme')
 
 # training
-parser.add_argument("--batch_size", type=int, default=512, help="batch size")
-parser.add_argument("--epochs", type=int, default=4000, help="Number of epochs")
+parser.add_argument("--batch_size", type=int, default=16, help="batch size") # Original default value: 512
+parser.add_argument("--epochs", type=int, default=1000, help="Number of epochs") # Original default value: 4000
 parser.add_argument("--lr", type=float, default=0.001, help="learning rate")
 parser.add_argument("--bptt", type=int, default=20, help="bptt")
 parser.add_argument("--dropout", type=float, default=0., help="drop prob")
@@ -119,19 +129,29 @@ np.random.seed(paras.seed)
 """
 Load data
 """
+## Original version of loading data
+# data = np.loadtxt('winding\data\winding_missing_prob_0.00.dat')
+# t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
+# X = data[:, 1:6]  # (Nsamples, 5)
+# Y = data[:, 6:8]  # (Nsamples, 2)
+# k_in = X.shape[1]
+# k_out = Y.shape[1]
 
-data = np.loadtxt('./data/winding_missing_prob_%.2f.dat' % paras.missing)
+# dt = np.expand_dims(data[:, 8], axis=1)  # (Nsamples, 1) # dt: sample rate
+# logging('loaded data, \nX', X.shape, '\nY', Y.shape, '\nt', t.shape, '\ndt', dt.shape,
+#         '\ntime intervals dt between %.3f and %.3f wide (%.3f on average).'%(np.min(dt), np.max(dt), np.mean(dt)))
 
+## HomeRLer's Version of loading data
+data = pd.read_csv('winding\data\odom-12-01-2024-run1.csv').to_numpy()
 t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
-X = data[:, 1:6]  # (Nsamples, 5)
-Y = data[:, 6:8]  # (Nsamples, 2)
+X = data[:, 1:14]  # (Nsamples, 13)
+Y = data[:, 11:14]  # (Nsamples, 3)
 k_in = X.shape[1]
 k_out = Y.shape[1]
-
-dt = np.expand_dims(data[:, 8], axis=1)  # (Nsamples, 1)
+sample_rate = 0.1
+dt = sample_rate * np.ones((X.shape[0],1))  # (Nsamples, 1) # In out version, assume sample rate is 0.1
 logging('loaded data, \nX', X.shape, '\nY', Y.shape, '\nt', t.shape, '\ndt', dt.shape,
         '\ntime intervals dt between %.3f and %.3f wide (%.3f on average).'%(np.min(dt), np.max(dt), np.mean(dt)))
-
 
 
 N = X.shape[0]  # number of samples in total
