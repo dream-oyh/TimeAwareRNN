@@ -81,7 +81,7 @@ class EpochTrainer(object):
         for i in range(int(np.ceil(len(self.train_inds) / self.batch_size))):
             # get indices for next batch
             iter_inds = self.train_inds[i * self.batch_size:(i + 1) * self.batch_size]
-            bs = len(iter_inds)
+            bs = len(iter_inds) # batch_size
 
             # get initial states for next batch
             #self.set_states()  #only 1 x per epoch, much faster
