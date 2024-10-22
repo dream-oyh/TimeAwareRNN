@@ -225,7 +225,7 @@ model = MIMO(k_in, k_out, paras.k_state, dropout=paras.dropout, cell_factory=cel
 if GPU:
     model = model.cuda()
 
-params = sum([np.prod(p.size()) for p in model.parameters()])
+params = sum([np.prod(p.size()) for p in model.parameters()]) # the total number of parameters
 logging('\nModel %s (time_aware: %s, scheme %s) with %d trainable parameters' % (paras.model, paras.time_aware, paras.scheme, params))
 for n, p in model.named_parameters():
     p_params = np.prod(p.size())
@@ -238,6 +238,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=paras.lr, weight_decay=paras
 
 
 # prepare tensors for evaluation
+# 都转成行向量？
 Xtrain_tn = torch.tensor(Xtrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_in)
 Ytrain_tn = torch.tensor(Ytrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_out)
 dttrain_tn = torch.tensor(dttrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, 1)

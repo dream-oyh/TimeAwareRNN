@@ -46,6 +46,11 @@ class GRUCell(nn.Module):
     ignore all init arguments except for k_in, k_out, k_state, dropout
     """
     def __init__(self, k_in, k_out, k_state, dropout=0., **kwargs):
+        """
+        k_in: feature numbers of input
+        k_out: feature numbers of output 
+        k_state: dimension of hidden state
+        """
         super().__init__()
         self.k_in = k_in
         self.k_out = k_out
@@ -54,7 +59,7 @@ class GRUCell(nn.Module):
 
         #self.cell = nn.GRUCell(k_in, k_state)
         self.expand_input = nn.Sequential(nn.Linear(k_in, k_state), nn.Tanh())
-        self.cell = nn.GRUCell(k_state, k_state)
+        self.cell = nn.GRUCell(k_state, k_state)  # 门控循环单元
         self.Ly = nn.Linear(k_state, k_out, bias=False)
         self.dropout = nn.Dropout(dropout)
 
