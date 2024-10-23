@@ -178,9 +178,13 @@ Load data
 #         '\ntime intervals dt between %.3f and %.3f wide (%.3f on average).'%(np.min(dt), np.max(dt), np.mean(dt)))
 
 ## HomeRLer's Version of loading data
-data = pd.read_csv("winding\data\odom-12-01-2024-run1.csv", index_col=0).to_numpy()
+data = pd.read_csv("winding\data\odom-19-02-2024-run6.csv", index_col=0).to_numpy()
 t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
-X = data[:, 1:11]  # (Nsamples, 10)
+
+X_1 = data[:, 1:11]  # (Nsamples, 10)
+X_2 = data[:, 26:34]  # (Nsamples, 8)
+X = np.hstack((X_1, X_2))  # (Nsamples, 18) x,y,z,qx,qy,qz,qw,bu,bv,bw,pwm1-8
+X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
 Y = data[:, 11:14]  # (Nsamples, 3)
 k_in = X.shape[1]
 k_out = Y.shape[1]
