@@ -180,7 +180,7 @@ Load data
 ## HomeRLer's Version of loading data
 data = pd.read_csv("winding\data\odom-12-01-2024-run1.csv", index_col=0).to_numpy()
 t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
-X = data[:, 1:14]  # (Nsamples, 13)
+X = data[:, 1:11]  # (Nsamples, 10)
 Y = data[:, 11:14]  # (Nsamples, 3)
 k_in = X.shape[1]
 k_out = Y.shape[1]
@@ -200,20 +200,43 @@ logging(
     "\ntime intervals dt between %.3f and %.3f wide (%.3f on average)."
     % (np.min(dt), np.max(dt), np.mean(dt)),
 )
+N = X.shape[0]  # number of samples in total
 
 
-# ## Load data from the discrete dataset
+# # ## Load data from the discrete dataset
 # dataset_dir = "dataset"
 # files_list = os.listdir(dataset_dir)
-# files_count = 0
+# file_counts = 0
+# X: list = []  # (file_nums, sample_nums, feature_nums)
+# Y: list = []  # (file_nums, sample_nums, feature_nums)
+# t: list = []  # (file_nums, sample_nums, 1)
 # for file in files_list:
 #     file_dir = dataset_dir + "/" + file
-#     df = pd.read_csv(file_dir, index_col=0).to_numpy()
-#     files_count += 1
+#     data = pd.read_csv(file_dir).to_numpy()
+#     file_counts += 1
+#     X.append(data[:, 1:11])  # (sample_nums, 10)
+#     Y.append(data[:, 11:14])  # (sample_nums, 3)
+#     t.append(data[:, 0])  # (sample_nums, 1)
+
+# N = sum([subdataset_X.shape[0] for subdataset_X in X])
+# sample_rate = 0.1
+# dt = sample_rate * np.ones((N, 1))  # (total_sample_nums, 1)
+# k_in = X[0].shape[1]
+# k_out = Y[0].shape[1]
+# logging(
+#     "Data has loaded, \nloaded subdatasets numbers,",
+#     file_counts,
+#     "\nX feature numbers:",
+#     k_in,
+#     "\nY feature numbers:",
+#     k_out,
+#     "\ntotal sample numbers:",
+#     N,
+#     "\nsample rate:",
+#     sample_rate,
+# )
 
 
-
-N = X.shape[0]  # number of samples in total
 Ndev = int(frac_dev * N)
 Ntest = int(frac_test * N)
 Ntrain = N - Ntest - Ndev
