@@ -1,6 +1,5 @@
 import argparse
 import os
-import pickle
 import shutil
 import sys
 import traceback
@@ -177,7 +176,7 @@ Load data
 # logging('loaded data, \nX', X.shape, '\nY', Y.shape, '\nt', t.shape, '\ndt', dt.shape,
 #         '\ntime intervals dt between %.3f and %.3f wide (%.3f on average).'%(np.min(dt), np.max(dt), np.mean(dt)))
 
-# ## HomeRLer's Version of loading data
+# ## HomeRLer's Version of loading data in a single trajectory
 # data = pd.read_csv("winding\data\odom-19-02-2024-run6.csv", index_col=0).to_numpy()
 # t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
 
@@ -324,23 +323,6 @@ for (i, Ndev), Ntrain in zip(enumerate(Ndev_num_list), Ntrain_num_list):
     ttest_list.append(t[i][Ntrain + Ndev + 1 :])
     dttest_list.append(dt[Ntrain + Ndev : -1])
 
-# Xtrain = X[:Ntrain, :]
-# dttrain = dt[:Ntrain, :]
-# Ytrain = Y[1 : Ntrain + 1, :]
-# ttrain = t[1 : Ntrain + 1, :]
-
-# Xdev = X[Ntrain : Ntrain + Ndev, :]
-# dtdev = dt[Ntrain : Ntrain + Ndev, :]
-# Ydev = Y[Ntrain + 1 : Ntrain + Ndev + 1, :]
-# tdev = t[Ntrain + 1 : Ntrain + Ndev + 1, :]
-
-# Xtest = X[Ntrain + Ndev : -1, :]
-# dttest = dt[
-#     Ntrain + Ndev : -1, :
-# ]  # last value was added artificially in data_processing.py, but is not used.
-# Ytest = Y[Ntrain + Ndev + 1 :, :]
-# ttest = t[Ntrain + Ndev + 1 :, :]
-
 
 """
 - model:
@@ -474,27 +456,6 @@ if GPU:
         ttest_tn_list[i] = ttest_tn_list[i].cuda()
         dttest_tn_list[i] = dttest_tn_list[i].cuda()
 
-# Xtrain_tn = torch.tensor(Xtrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_in)
-# Ytrain_tn = torch.tensor(Ytrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_out)
-# dttrain_tn = torch.tensor(dttrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, 1)
-# Xdev_tn = torch.tensor(Xdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_in)
-# Ydev_tn = torch.tensor(Ydev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_out)
-# dtdev_tn = torch.tensor(dtdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, 1)
-# Xtest_tn = torch.tensor(Xtest, dtype=torch.float).unsqueeze(0)
-# Ytest_tn = torch.tensor(Ytest, dtype=torch.float).unsqueeze(0)
-# dttest_tn = torch.tensor(dttest, dtype=torch.float).unsqueeze(0)
-
-# if GPU:
-#     Xtrain_tn = Xtrain_tn.cuda()
-#     Ytrain_tn = Ytrain_tn.cuda()
-#     dttrain_tn = dttrain_tn.cuda()
-#     Xdev_tn = Xdev_tn.cuda()
-#     Ydev_tn = Ydev_tn.cuda()
-#     dtdev_tn = dtdev_tn.cuda()
-#     Xtest_tn = Xtest_tn.cuda()
-#     Ytest_tn = Ytest_tn.cuda()
-#     dttest_tn = dttest_tn.cuda()
-
 
 def t2np(tensor: torch.Tensor) -> np.ndarray:
     return tensor.squeeze().detach().cpu().numpy()
@@ -608,7 +569,7 @@ try:  # catch error and redirect to logger
                         tdev,
                         Ydev,
                         t2np(Y_dev_pred_list[i]),
-                        paras.save +"/dev",
+                        paras.save + "/dev",
                         "current_dev_results of %dth trajectory" % i,
                         msg="dev results (dev error %.3f) at iter %d"
                         % (error_dev_list[i], epoch),
@@ -624,10 +585,11 @@ try:  # catch error and redirect to logger
                     Y_test_pred_list = []
 
                     for i in range(len(Xtrain_list)):
-
-                    # corresponding test result:
+                        # corresponding test result:
                         Ytest_pred, _ = model(
-                            Xtest_tn_list[i], state0=h_dev_pred_list[i][:, -1, :], dt=dttest_tn_list[i]
+                            Xtest_tn_list[i],
+                            state0=h_dev_pred_list[i][:, -1, :],
+                            dt=dttest_tn_list[i],
                         )
                         error_test = prediction_error(Ytest_list[i], t2np(Ytest_pred))
 
