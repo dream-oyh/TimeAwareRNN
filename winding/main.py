@@ -21,7 +21,7 @@ from taho.model import (
     IncrHOGRUCell,
 )
 from taho.train import EpochTrainer
-from taho.util import SimpleLogger, show_data
+from taho.util import SimpleLogger, predict, prediction_error, show_data, t2np
 
 GPU = torch.cuda.is_available()
 
@@ -210,20 +210,20 @@ Load data
 dataset_dir = "dataset"
 files_list = os.listdir(dataset_dir)
 file_counts = 0
-X: list = []  # (file_nums, sample_nums, feature_nums)
-Y: list = []  # (file_nums, sample_nums, feature_nums)
-t: list = []  # (file_nums, sample_nums, 1)
+X: list[np.ndarray] = []  # (file_nums, sample_nums, feature_nums)
+Y: list[np.ndarray] = []  # (file_nums, sample_nums, feature_nums)
+t: list[np.ndarray] = []  # (file_nums, sample_nums, 1)
 sample_num_list: list = []  # (file_nums, 1)
 for file in files_list:
     file_dir = dataset_dir + "/" + file
     data = pd.read_csv(file_dir).to_numpy()
     file_counts += 1
-    X1 = data[:, 1:11]
-    X2 = data[:, 26:34]
+    X1 = data[:, 1:14] # x,y,z,qx,qy,qz,qw,bu,bv,bw,bp,bq,br
+    X2 = data[:, 26:34] # pwm1-8
     X_np = np.hstack((X1, X2))
     X_np = (X_np - np.min(X_np, axis=0)) / (np.max(X_np, axis=0) - np.min(X_np, axis=0))
     X.append(X_np)  # (sample_nums, 10)
-    Y_np = data[:, 11:14]
+    Y_np = data[:, 11:14] # bp,bq,br
     Y_np = (Y_np - np.min(Y_np, axis=0)) / (np.max(Y_np, axis=0) - np.min(Y_np, axis=0))
     Y.append(Y_np)  # (sample_nums, 3)
     t.append(data[:, 0])  # (sample_nums, 1)
@@ -278,18 +278,6 @@ logging(
 evaluation function
 RRSE error
 """
-
-
-def prediction_error(truth: np.ndarray, prediction: np.ndarray):
-    assert (
-        truth.shape == prediction.shape
-    ), "Incompatible truth and prediction for calculating prediction error"
-    # each shape (sequence, n_outputs)
-    # Root Relative Squared Error
-    se = np.sum((truth - prediction) ** 2, axis=0)  # summed squared error per channel
-    rse = se / np.sum((truth - np.mean(truth, axis=0)) ** 2)  # relative squared error
-    rrse = np.mean(np.sqrt(rse))  # square root, followed by mean over channels
-    return 100 * rrse  # in percentage
 
 
 Xtrain_list: list = []
@@ -457,10 +445,6 @@ if GPU:
         dttest_tn_list[i] = dttest_tn_list[i].cuda()
 
 
-def t2np(tensor: torch.Tensor) -> np.ndarray:
-    return tensor.squeeze().detach().cpu().numpy()
-
-
 trainer = EpochTrainer(
     model,
     optimizer,
@@ -484,81 +468,56 @@ max_epochs_no_decrease = 1000
 try:  # catch error and redirect to logger
     for epoch in range(1, paras.epochs + 1):
         # train 1 epoch
-        mse_train = trainer(epoch)
+        ave_mse_train = trainer(epoch)
 
         if epoch % paras.eval_epochs == 0:
             with torch.no_grad():
                 model.eval()
                 # (1) forecast on train data steps
-                h_train_pred_list: list[torch.Tensor] = []
-                Y_train_pred_list: list[torch.Tensor] = []
-                error_train_list = []
 
-                for i in range(len(Xtrain_tn_list)):
-                    X_train_tn = Xtrain_tn_list[i]
-                    dt_train_tn = dttest_tn_list[i]
-                    Ytrain_pred, htrain_pred = model(X_train_tn, dt=dt_train_tn)
-                    error_train_step = prediction_error(
-                        Ytrain_list[i], t2np(Ytrain_pred)
-                    )
-
-                    error_train_list.append(error_train_step)
-                    Y_train_pred_list.append(Ytrain_pred)
-                    h_train_pred_list.append(htrain_pred)
-
-                error_train = np.mean(np.array(error_train_list))
+                Y_train_pred_list, h_train_pred_list, error_train_list = predict(
+                    Xtrain_tn_list,
+                    Ytrain_tn_list,
+                    dttrain_tn_list,
+                    model,
+                    is_mse_list=False,
+                )
+                ave_error_train = np.mean(np.array(error_train_list))
 
                 # (2) forecast on dev data
-                error_dev_list = []
-                mse_dev_list = []
-                Y_dev_pred_list = []
-                h_dev_pred_list = []
-
-                for i in range(len(Xdev_tn_list)):
-                    Xdev_tn = Xdev_tn_list[i]
-                    dtdev_tn = dtdev_tn_list[i]
-                    Ydev_tn = Ydev_tn_list[i]
-                    htrain_pred = h_train_pred_list[i]
-
-                    Ydev_pred, hdev_pred = model(
-                        Xdev_tn, state0=htrain_pred[:, -1, :], dt=dtdev_tn
+                Y_dev_pred_list, h_dev_pred_list, error_dev_list, mse_dev_list = (
+                    predict(
+                        Xdev_tn_list,
+                        Ydev_tn_list,
+                        dtdev_tn_list,
+                        model,
                     )
-                    mse_dev_step = model.criterion(Ydev_pred, Ydev_tn).item()
-                    error_dev_step = prediction_error(Ydev_list[i], t2np(Ydev_pred))
+                )
 
-                    error_dev_list.append(error_dev_step)
-                    mse_dev_list.append(mse_dev_step)
-                    Y_dev_pred_list.append(Ydev_pred)
-                    h_dev_pred_list.append(hdev_pred)
-
-                mse_dev = np.mean(np.array(mse_dev_list))
-                error_dev = np.mean(np.array(error_dev_list))
+                ave_mse_dev = np.mean(np.array(mse_dev_list))
+                ave_error_dev = np.mean(np.array(error_dev_list))
 
                 # report evaluation results
-                log_value("train/average_mse", mse_train, epoch)
-                log_value("train/average_error", error_train, epoch)
-                log_value("dev/average_loss", mse_dev, epoch)
-                log_value("dev/average_error", error_dev, epoch)
+                log_value("train/average_mse", ave_mse_train, epoch)
+                log_value("train/average_error", ave_error_train, epoch)
+                log_value("dev/average_loss", ave_mse_dev, epoch)
+                log_value("dev/average_error", ave_error_dev, epoch)
 
                 logging(
                     "epoch %04d | ave_loss %.3f (train), %.3f (dev) | ave_error %.3f (train), %.3f (dev) | tt %.2fmin"
                     % (
                         epoch,
-                        mse_train,
-                        mse_dev,
-                        error_train,
-                        error_dev,
+                        ave_mse_train,
+                        ave_mse_dev,
+                        ave_error_train,
+                        ave_error_dev,
                         (time() - t00) / 60.0,
                     )
                 )
                 for i in range(len(Xtrain_list)):
-                    ttrain = ttrain_list[i]
-                    Ytrain = Ytrain_list[i]
-                    tdev = tdev_list[i]
-                    Ydev = Ydev_list[i]
                     show_data(
-                        ttrain,
-                        Ytrain,
+                        ttrain_list[i],
+                        Ytrain_list[i],
                         t2np(Y_train_pred_list[i]),
                         paras.save + "/train",
                         "current_train_results of %dth trajectory" % i,
@@ -566,8 +525,8 @@ try:  # catch error and redirect to logger
                         % (error_train_list[i], epoch),
                     )
                     show_data(
-                        tdev,
-                        Ydev,
+                        tdev_list[i],
+                        Ydev_list[i],
                         t2np(Y_dev_pred_list[i]),
                         paras.save + "/dev",
                         "current_dev_results of %dth trajectory" % i,
@@ -576,26 +535,21 @@ try:  # catch error and redirect to logger
                     )
 
                 # update best dev model
-                if error_dev < best_dev_error:
-                    best_dev_error = error_dev
+                if ave_error_dev < best_dev_error:
+                    best_dev_error = ave_error_dev
                     best_dev_epoch = epoch
                     log_value("dev/best_error", best_dev_error, epoch)
 
-                    error_test_list = []
-                    Y_test_pred_list = []
+                    Y_test_pred_list, h_test_pred_list, error_test_list = predict(
+                        Xtest_tn_list,
+                        Ytest_tn_list,
+                        dttest_tn_list,
+                        model,
+                        is_mse_list=False,
+                    )
 
-                    for i in range(len(Xtrain_list)):
-                        # corresponding test result:
-                        Ytest_pred, _ = model(
-                            Xtest_tn_list[i],
-                            state0=h_dev_pred_list[i][:, -1, :],
-                            dt=dttest_tn_list[i],
-                        )
-                        error_test = prediction_error(Ytest_list[i], t2np(Ytest_pred))
 
-                        error_test_list.append(error_test)
-                        Y_test_pred_list.append(Ytest_pred)
-
+                    for i in range(len(Xdev_list)):
                         show_data(
                             tdev_list[i],
                             Ydev_list[i],
@@ -615,27 +569,27 @@ try:  # catch error and redirect to logger
                             % (error_test_list[i], epoch),
                         )
 
-                    log_value("test/corresp_error", error_test_list, epoch)
-                    logging("new best dev average error %.3f" % best_dev_error)
+                        log_value("test/corresp_error", error_test_list, epoch)
+                        logging("new best dev average error %.3f" % best_dev_error)
 
-                    # make figure of best model on train, dev and test set for debugging
+                        # make figure of best model on train, dev and test set for debugging
 
-                    # save model
-                    # torch.save(model.state_dict(), os.path.join(paras.save, 'best_dev_model_state_dict.pt'))
-                    torch.save(model, os.path.join(paras.save, "best_dev_model.pt"))
+                        # save model
+                        # torch.save(model.state_dict(), os.path.join(paras.save, 'best_dev_model_state_dict.pt'))
+                        torch.save(model, os.path.join(paras.save, "best_dev_model.pt"))
 
-                    # save dev and test predictions of best dev model
-                    # pickle.dump(
-                    #     {
-                    #         "t_dev": tdev,
-                    #         "y_target_dev": Ydev,
-                    #         "y_pred_dev": t2np(Ydev_pred),
-                    #         "t_test": ttest,
-                    #         "y_target_test": Ytest,
-                    #         "y_pred_test": t2np(Ytest_pred),
-                    #     },
-                    #     open(os.path.join(paras.save, "data4figs.pkl"), "wb"),
-                    # )
+                        # save dev and test predictions of best dev model
+                        # pickle.dump(
+                        #     {
+                        #         "t_dev": tdev,
+                        #         "y_target_dev": Ydev,
+                        #         "y_pred_dev": t2np(Ydev_pred),
+                        #         "t_test": ttest,
+                        #         "y_target_test": Ytest,
+                        #         "y_pred_test": t2np(Ytest_pred),
+                        #     },
+                        #     open(os.path.join(paras.save, "data4figs.pkl"), "wb"),
+                        # )
 
                 elif epoch - best_dev_epoch > max_epochs_no_decrease:
                     logging(
