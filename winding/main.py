@@ -219,8 +219,14 @@ for file in files_list:
     file_dir = dataset_dir + "/" + file
     data = pd.read_csv(file_dir).to_numpy()
     file_counts += 1
-    X.append(data[:, 1:11])  # (sample_nums, 10)
-    Y.append(data[:, 11:14])  # (sample_nums, 3)
+    X1 = data[:, 1:11]
+    X2 = data[:, 26:34]
+    X_np = np.hstack((X1, X2))
+    X_np = (X_np - np.min(X_np, axis=0)) / (np.max(X_np, axis=0) - np.min(X_np, axis=0))
+    X.append(X_np)  # (sample_nums, 10)
+    Y_np = data[:, 11:14]
+    Y_np = (Y_np - np.min(Y_np, axis=0)) / (np.max(Y_np, axis=0) - np.min(Y_np, axis=0))
+    Y.append(Y_np)  # (sample_nums, 3)
     t.append(data[:, 0])  # (sample_nums, 1)
     sample_num_list.append(data.shape[0])  # (file_nums, 1)
 
@@ -287,36 +293,36 @@ def prediction_error(truth: np.ndarray, prediction: np.ndarray):
     return 100 * rrse  # in percentage
 
 
-Xtrain: list = []
-Ytrain: list = []
-ttrain: list = []
-dttrain: list = []
+Xtrain_list: list = []
+Ytrain_list: list = []
+ttrain_list: list = []
+dttrain_list: list = []
 
-Xdev: list = []
-Ydev: list = []
-tdev: list = []
-dtdev: list = []
+Xdev_list: list = []
+Ydev_list: list = []
+tdev_list: list = []
+dtdev_list: list = []
 
-Xtest: list = []
-Ytest: list = []
-ttest: list = []
-dttest: list = []
+Xtest_list: list = []
+Ytest_list: list = []
+ttest_list: list = []
+dttest_list: list = []
 
 for (i, Ndev), Ntrain in zip(enumerate(Ndev_num_list), Ntrain_num_list):
-    Xtrain.append(X[i][:Ntrain, :])
-    Ytrain.append(Y[i][1 : Ntrain + 1, :])
-    ttrain.append(t[i][1 : Ntrain + 1])
-    dttrain.append(dt[:Ntrain])
+    Xtrain_list.append(X[i][:Ntrain, :])
+    Ytrain_list.append(Y[i][1 : Ntrain + 1, :])
+    ttrain_list.append(t[i][1 : Ntrain + 1])
+    dttrain_list.append(dt[:Ntrain])
 
-    Xdev.append(X[i][Ntrain : Ntrain + Ndev, :])
-    Ydev.append(Y[i][Ntrain + 1 : Ntrain + Ndev + 1, :])
-    tdev.append(t[i][Ntrain + 1 : Ntrain + Ndev + 1])
-    dtdev.append(dt[Ntrain : Ntrain + Ndev])
+    Xdev_list.append(X[i][Ntrain : Ntrain + Ndev, :])
+    Ydev_list.append(Y[i][Ntrain + 1 : Ntrain + Ndev + 1, :])
+    tdev_list.append(t[i][Ntrain + 1 : Ntrain + Ndev + 1])
+    dtdev_list.append(dt[Ntrain : Ntrain + Ndev])
 
-    Xtest.append(X[i][Ntrain + Ndev : -1, :])
-    Ytest.append(Y[i][Ntrain + Ndev + 1 :, :])
-    ttest.append(t[i][Ntrain + Ndev + 1 :])
-    dttest.append(dt[Ntrain + Ndev : -1])
+    Xtest_list.append(X[i][Ntrain + Ndev : -1, :])
+    Ytest_list.append(Y[i][Ntrain + Ndev + 1 :, :])
+    ttest_list.append(t[i][Ntrain + Ndev + 1 :])
+    dttest_list.append(dt[Ntrain + Ndev : -1])
 
 # Xtrain = X[:Ntrain, :]
 # dttrain = dt[:Ntrain, :]
@@ -380,7 +386,7 @@ elif paras.model == "ARNNinc":
 else:
     raise NotImplementedError("unknown model type " + paras.model)
 
-dt_mean = np.mean(dttrain[0])
+dt_mean = np.mean(dttrain_list[0])
 model = MIMO(
     k_in,
     k_out,
@@ -418,29 +424,79 @@ optimizer = torch.optim.Adam(model.parameters(), lr=paras.lr, weight_decay=paras
 
 # prepare tensors for evaluation
 # 都转成行向量
-Xtrain_tn = torch.tensor(Xtrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_in)
-Ytrain_tn = torch.tensor(Ytrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_out)
-dttrain_tn = torch.tensor(dttrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, 1)
-Xdev_tn = torch.tensor(Xdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_in)
-Ydev_tn = torch.tensor(Ydev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_out)
-dtdev_tn = torch.tensor(dtdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, 1)
-Xtest_tn = torch.tensor(Xtest, dtype=torch.float).unsqueeze(0)
-Ytest_tn = torch.tensor(Ytest, dtype=torch.float).unsqueeze(0)
-dttest_tn = torch.tensor(dttest, dtype=torch.float).unsqueeze(0)
+Xtrain_tn_list: list[torch.Tensor] = []
+Ytrain_tn_list: list[torch.Tensor] = []
+ttrain_tn_list: list[torch.Tensor] = []
+dttrain_tn_list: list[torch.Tensor] = []
+
+Xdev_tn_list: list[torch.Tensor] = []
+Ydev_tn_list: list[torch.Tensor] = []
+tdev_tn_list: list[torch.Tensor] = []
+dtdev_tn_list: list[torch.Tensor] = []
+
+Xtest_tn_list: list[torch.Tensor] = []
+Ytest_tn_list: list[torch.Tensor] = []
+ttest_tn_list: list[torch.Tensor] = []
+dttest_tn_list: list[torch.Tensor] = []
+
+for i in range(len(Xtrain_list)):
+    Xtrain_tn_list.append(torch.tensor(Xtrain_list[i], dtype=torch.float).unsqueeze(0))
+    Ytrain_tn_list.append(torch.tensor(Ytrain_list[i], dtype=torch.float).unsqueeze(0))
+    ttrain_tn_list.append(torch.tensor(ttrain_list[i], dtype=torch.float).unsqueeze(0))
+    dttrain_tn_list.append(
+        torch.tensor(dttrain_list[i], dtype=torch.float).unsqueeze(0)
+    )
+
+    Xdev_tn_list.append(torch.tensor(Xdev_list[i], dtype=torch.float).unsqueeze(0))
+    Ydev_tn_list.append(torch.tensor(Ydev_list[i], dtype=torch.float).unsqueeze(0))
+    tdev_tn_list.append(torch.tensor(tdev_list[i], dtype=torch.float).unsqueeze(0))
+    dtdev_tn_list.append(torch.tensor(dtdev_list[i], dtype=torch.float).unsqueeze(0))
+
+    Xtest_tn_list.append(torch.tensor(Xtest_list[i], dtype=torch.float).unsqueeze(0))
+    Ytest_tn_list.append(torch.tensor(Ytest_list[i], dtype=torch.float).unsqueeze(0))
+    ttest_tn_list.append(torch.tensor(ttest_list[i], dtype=torch.float).unsqueeze(0))
+    dttest_tn_list.append(torch.tensor(dttest_list[i], dtype=torch.float).unsqueeze(0))
 
 if GPU:
-    Xtrain_tn = Xtrain_tn.cuda()
-    Ytrain_tn = Ytrain_tn.cuda()
-    dttrain_tn = dttrain_tn.cuda()
-    Xdev_tn = Xdev_tn.cuda()
-    Ydev_tn = Ydev_tn.cuda()
-    dtdev_tn = dtdev_tn.cuda()
-    Xtest_tn = Xtest_tn.cuda()
-    Ytest_tn = Ytest_tn.cuda()
-    dttest_tn = dttest_tn.cuda()
+    for i in range(len(Xtrain_tn_list)):
+        Xtrain_tn_list[i] = Xtrain_tn_list[i].cuda()
+        Ytrain_tn_list[i] = Ytrain_tn_list[i].cuda()
+        ttrain_tn_list[i] = ttrain_tn_list[i].cuda()
+        dttrain_tn_list[i] = dttrain_tn_list[i].cuda()
+
+        Xdev_tn_list[i] = Xdev_tn_list[i].cuda()
+        Ydev_tn_list[i] = Ydev_tn_list[i].cuda()
+        tdev_tn_list[i] = tdev_tn_list[i].cuda()
+        dtdev_tn_list[i] = dtdev_tn_list[i].cuda()
+
+        Xtest_tn_list[i] = Xtest_tn_list[i].cuda()
+        Ytest_tn_list[i] = Ytest_tn_list[i].cuda()
+        ttest_tn_list[i] = ttest_tn_list[i].cuda()
+        dttest_tn_list[i] = dttest_tn_list[i].cuda()
+
+# Xtrain_tn = torch.tensor(Xtrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_in)
+# Ytrain_tn = torch.tensor(Ytrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, k_out)
+# dttrain_tn = torch.tensor(dttrain, dtype=torch.float).unsqueeze(0)  # (1, Ntrain, 1)
+# Xdev_tn = torch.tensor(Xdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_in)
+# Ydev_tn = torch.tensor(Ydev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, k_out)
+# dtdev_tn = torch.tensor(dtdev, dtype=torch.float).unsqueeze(0)  # (1, Ndev, 1)
+# Xtest_tn = torch.tensor(Xtest, dtype=torch.float).unsqueeze(0)
+# Ytest_tn = torch.tensor(Ytest, dtype=torch.float).unsqueeze(0)
+# dttest_tn = torch.tensor(dttest, dtype=torch.float).unsqueeze(0)
+
+# if GPU:
+#     Xtrain_tn = Xtrain_tn.cuda()
+#     Ytrain_tn = Ytrain_tn.cuda()
+#     dttrain_tn = dttrain_tn.cuda()
+#     Xdev_tn = Xdev_tn.cuda()
+#     Ydev_tn = Ydev_tn.cuda()
+#     dtdev_tn = dtdev_tn.cuda()
+#     Xtest_tn = Xtest_tn.cuda()
+#     Ytest_tn = Ytest_tn.cuda()
+#     dttest_tn = dttest_tn.cuda()
 
 
-def t2np(tensor):
+def t2np(tensor: torch.Tensor) -> np.ndarray:
     return tensor.squeeze().detach().cpu().numpy()
 
 
@@ -448,9 +504,9 @@ trainer = EpochTrainer(
     model,
     optimizer,
     paras.epochs,
-    Xtrain,
-    Ytrain,
-    dttrain,
+    Xtrain_list,
+    Ytrain_list,
+    dttrain_list,
     batch_size=paras.batch_size,
     gpu=GPU,
     bptt=paras.bptt,
@@ -473,24 +529,58 @@ try:  # catch error and redirect to logger
             with torch.no_grad():
                 model.eval()
                 # (1) forecast on train data steps
-                Ytrain_pred, htrain_pred = model(Xtrain_tn, dt=dttrain_tn)
-                error_train = prediction_error(Ytrain, t2np(Ytrain_pred))
+                h_train_pred_list: list[torch.Tensor] = []
+                Y_train_pred_list: list[torch.Tensor] = []
+                error_train_list = []
+
+                for i in range(len(Xtrain_tn_list)):
+                    X_train_tn = Xtrain_tn_list[i]
+                    dt_train_tn = dttest_tn_list[i]
+                    Ytrain_pred, htrain_pred = model(X_train_tn, dt=dt_train_tn)
+                    error_train_step = prediction_error(
+                        Ytrain_list[i], t2np(Ytrain_pred)
+                    )
+
+                    error_train_list.append(error_train_step)
+                    Y_train_pred_list.append(Ytrain_pred)
+                    h_train_pred_list.append(htrain_pred)
+
+                error_train = np.mean(np.array(error_train_list))
 
                 # (2) forecast on dev data
-                Ydev_pred, hdev_pred = model(
-                    Xdev_tn, state0=htrain_pred[:, -1, :], dt=dtdev_tn
-                )
-                mse_dev = model.criterion(Ydev_pred, Ydev_tn).item()
-                error_dev = prediction_error(Ydev, t2np(Ydev_pred))
+                error_dev_list = []
+                mse_dev_list = []
+                Y_dev_pred_list = []
+                h_dev_pred_list = []
+
+                for i in range(len(Xdev_tn_list)):
+                    Xdev_tn = Xdev_tn_list[i]
+                    dtdev_tn = dtdev_tn_list[i]
+                    Ydev_tn = Ydev_tn_list[i]
+                    htrain_pred = h_train_pred_list[i]
+
+                    Ydev_pred, hdev_pred = model(
+                        Xdev_tn, state0=htrain_pred[:, -1, :], dt=dtdev_tn
+                    )
+                    mse_dev_step = model.criterion(Ydev_pred, Ydev_tn).item()
+                    error_dev_step = prediction_error(Ydev_list[i], t2np(Ydev_pred))
+
+                    error_dev_list.append(error_dev_step)
+                    mse_dev_list.append(mse_dev_step)
+                    Y_dev_pred_list.append(Ydev_pred)
+                    h_dev_pred_list.append(hdev_pred)
+
+                mse_dev = np.mean(np.array(mse_dev_list))
+                error_dev = np.mean(np.array(error_dev_list))
 
                 # report evaluation results
-                log_value("train/mse", mse_train, epoch)
-                log_value("train/error", error_train, epoch)
-                log_value("dev/loss", mse_dev, epoch)
-                log_value("dev/error", error_dev, epoch)
+                log_value("train/average_mse", mse_train, epoch)
+                log_value("train/average_error", error_train, epoch)
+                log_value("dev/average_loss", mse_dev, epoch)
+                log_value("dev/average_error", error_dev, epoch)
 
                 logging(
-                    "epoch %04d | loss %.3f (train), %.3f (dev) | error %.3f (train), %.3f (dev) | tt %.2fmin"
+                    "epoch %04d | ave_loss %.3f (train), %.3f (dev) | ave_error %.3f (train), %.3f (dev) | tt %.2fmin"
                     % (
                         epoch,
                         mse_train,
@@ -500,23 +590,29 @@ try:  # catch error and redirect to logger
                         (time() - t00) / 60.0,
                     )
                 )
-                show_data(
-                    ttrain,
-                    Ytrain,
-                    t2np(Ytrain_pred),
-                    paras.save,
-                    "current_trainresults",
-                    msg="train results (train error %.3f) at iter %d"
-                    % (error_train, epoch),
-                )
-                show_data(
-                    tdev,
-                    Ydev,
-                    t2np(Ydev_pred),
-                    paras.save,
-                    "current_devresults",
-                    msg="dev results (dev error %.3f) at iter %d" % (error_dev, epoch),
-                )
+                for i in range(len(Xtrain_list)):
+                    ttrain = ttrain_list[i]
+                    Ytrain = Ytrain_list[i]
+                    tdev = tdev_list[i]
+                    Ydev = Ydev_list[i]
+                    show_data(
+                        ttrain,
+                        Ytrain,
+                        t2np(Y_train_pred_list[i]),
+                        paras.save + "/train",
+                        "current_train_results of %dth trajectory" % i,
+                        msg="train results (train error %.3f) at iter %d"
+                        % (error_train_list[i], epoch),
+                    )
+                    show_data(
+                        tdev,
+                        Ydev,
+                        t2np(Y_dev_pred_list[i]),
+                        paras.save +"/dev",
+                        "current_dev_results of %dth trajectory" % i,
+                        msg="dev results (dev error %.3f) at iter %d"
+                        % (error_dev_list[i], epoch),
+                    )
 
                 # update best dev model
                 if error_dev < best_dev_error:
@@ -524,50 +620,60 @@ try:  # catch error and redirect to logger
                     best_dev_epoch = epoch
                     log_value("dev/best_error", best_dev_error, epoch)
 
+                    error_test_list = []
+                    Y_test_pred_list = []
+
+                    for i in range(len(Xtrain_list)):
+
                     # corresponding test result:
-                    Ytest_pred, _ = model(
-                        Xtest_tn, state0=hdev_pred[:, -1, :], dt=dttest_tn
-                    )
-                    error_test = prediction_error(Ytest, t2np(Ytest_pred))
-                    log_value("test/corresp_error", error_test, epoch)
-                    logging("new best dev error %.3f" % best_dev_error)
+                        Ytest_pred, _ = model(
+                            Xtest_tn_list[i], state0=h_dev_pred_list[i][:, -1, :], dt=dttest_tn_list[i]
+                        )
+                        error_test = prediction_error(Ytest_list[i], t2np(Ytest_pred))
+
+                        error_test_list.append(error_test)
+                        Y_test_pred_list.append(Ytest_pred)
+
+                        show_data(
+                            tdev_list[i],
+                            Ydev_list[i],
+                            t2np(Y_dev_pred_list[i]),
+                            paras.save + "/best_dev/dev",
+                            "best_dev_dev_results of %dth trajectory" % i,
+                            msg="dev results (dev error %.3f) at iter %d"
+                            % (error_dev_list[i], epoch),
+                        )
+                        show_data(
+                            ttest_list[i],
+                            Ytest_list[i],
+                            t2np(Y_test_pred_list[i]),
+                            paras.save + "/best_dev/test",
+                            "best_dev_test_results of %dth trajectory" % i,
+                            msg="test results (test error %.3f) at iter %d (=best dev)"
+                            % (error_test_list[i], epoch),
+                        )
+
+                    log_value("test/corresp_error", error_test_list, epoch)
+                    logging("new best dev average error %.3f" % best_dev_error)
 
                     # make figure of best model on train, dev and test set for debugging
-                    show_data(
-                        tdev,
-                        Ydev,
-                        t2np(Ydev_pred),
-                        paras.save,
-                        "best_dev_devresults",
-                        msg="dev results (dev error %.3f) at iter %d"
-                        % (error_dev, epoch),
-                    )
-                    show_data(
-                        ttest,
-                        Ytest,
-                        t2np(Ytest_pred),
-                        paras.save,
-                        "best_dev_testresults",
-                        msg="test results (test error %.3f) at iter %d (=best dev)"
-                        % (error_test, epoch),
-                    )
 
                     # save model
                     # torch.save(model.state_dict(), os.path.join(paras.save, 'best_dev_model_state_dict.pt'))
                     torch.save(model, os.path.join(paras.save, "best_dev_model.pt"))
 
                     # save dev and test predictions of best dev model
-                    pickle.dump(
-                        {
-                            "t_dev": tdev,
-                            "y_target_dev": Ydev,
-                            "y_pred_dev": t2np(Ydev_pred),
-                            "t_test": ttest,
-                            "y_target_test": Ytest,
-                            "y_pred_test": t2np(Ytest_pred),
-                        },
-                        open(os.path.join(paras.save, "data4figs.pkl"), "wb"),
-                    )
+                    # pickle.dump(
+                    #     {
+                    #         "t_dev": tdev,
+                    #         "y_target_dev": Ydev,
+                    #         "y_pred_dev": t2np(Ydev_pred),
+                    #         "t_test": ttest,
+                    #         "y_target_test": Ytest,
+                    #         "y_pred_test": t2np(Ytest_pred),
+                    #     },
+                    #     open(os.path.join(paras.save, "data4figs.pkl"), "wb"),
+                    # )
 
                 elif epoch - best_dev_epoch > max_epochs_no_decrease:
                     logging(
@@ -577,7 +683,7 @@ try:  # catch error and redirect to logger
                     break
 
     log_value("finished/best_dev_error", best_dev_error, 0)
-    log_value("finished/corresp_test_error", error_test, 0)
+    log_value("finished/corresp_test_error", error_test_list, 0)
 
     logging(
         "Finished: best dev error",
@@ -585,7 +691,7 @@ try:  # catch error and redirect to logger
         "at epoch",
         best_dev_epoch,
         "with corresp. test error",
-        error_test,
+        error_test_list,
     )
 
 
