@@ -65,3 +65,5 @@ The "Original Version of loading data" is original way of this repo, and "HomeRL
 - [x] DONE: Improve this code to be able to load data on multiple datasets.
 - [ ] TODO: Test the new method of training the model in a dataset with multiple secrete files.
 - [ ] TODO: Improve code structure
+
+After testing this repo in the original dataset, the test error won't decrease after 1000 epoches. So I abandoned this repo.
