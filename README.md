@@ -62,6 +62,6 @@ To deploy this model to BlueROV2 robot system identification, We modified the `w
 
 The "Original Version of loading data" is original way of this repo, and "HomeRLer's Version" is ours.
 
-- [ x ] TODO: Try to cascade different data from separate csv files and train the model in a larger dataset.
+- [x] TODO: Try to cascade different data from separate csv files and train the model in a larger dataset.
 - [ ] TODO: Test the new method of training the model in a dataset with multiple secrete files.
 - [ ] TODO: Improve code structure
