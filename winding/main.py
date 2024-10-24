@@ -177,79 +177,97 @@ Load data
 # logging('loaded data, \nX', X.shape, '\nY', Y.shape, '\nt', t.shape, '\ndt', dt.shape,
 #         '\ntime intervals dt between %.3f and %.3f wide (%.3f on average).'%(np.min(dt), np.max(dt), np.mean(dt)))
 
-## HomeRLer's Version of loading data
-data = pd.read_csv("winding\data\odom-19-02-2024-run6.csv", index_col=0).to_numpy()
-t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
+# ## HomeRLer's Version of loading data
+# data = pd.read_csv("winding\data\odom-19-02-2024-run6.csv", index_col=0).to_numpy()
+# t = np.expand_dims(data[:, 0], axis=1)  # (Nsamples, 1)
 
-X_1 = data[:, 1:11]  # (Nsamples, 10)
-X_2 = data[:, 26:34]  # (Nsamples, 8)
-X = np.hstack((X_1, X_2))  # (Nsamples, 18) x,y,z,qx,qy,qz,qw,bu,bv,bw,pwm1-8
-X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
-Y = data[:, 11:14]  # (Nsamples, 3)
-k_in = X.shape[1]
-k_out = Y.shape[1]
-sample_rate = 0.1
-dt = sample_rate * np.ones(
-    (X.shape[0], 1)
-)  # (Nsamples, 1) # In out version, assume sample rate is 0.1
-logging(
-    "loaded data, \nX",
-    X.shape,
-    "\nY",
-    Y.shape,
-    "\nt",
-    t.shape,
-    "\ndt",
-    dt.shape,
-    "\ntime intervals dt between %.3f and %.3f wide (%.3f on average)."
-    % (np.min(dt), np.max(dt), np.mean(dt)),
-)
-N = X.shape[0]  # number of samples in total
-
-
-# # ## Load data from the discrete dataset
-# dataset_dir = "dataset"
-# files_list = os.listdir(dataset_dir)
-# file_counts = 0
-# X: list = []  # (file_nums, sample_nums, feature_nums)
-# Y: list = []  # (file_nums, sample_nums, feature_nums)
-# t: list = []  # (file_nums, sample_nums, 1)
-# for file in files_list:
-#     file_dir = dataset_dir + "/" + file
-#     data = pd.read_csv(file_dir).to_numpy()
-#     file_counts += 1
-#     X.append(data[:, 1:11])  # (sample_nums, 10)
-#     Y.append(data[:, 11:14])  # (sample_nums, 3)
-#     t.append(data[:, 0])  # (sample_nums, 1)
-
-# N = sum([subdataset_X.shape[0] for subdataset_X in X])
+# X_1 = data[:, 1:11]  # (Nsamples, 10)
+# X_2 = data[:, 26:34]  # (Nsamples, 8)
+# X = np.hstack((X_1, X_2))  # (Nsamples, 18) x,y,z,qx,qy,qz,qw,bu,bv,bw,pwm1-8
+# X = (X - np.min(X, axis=0)) / (np.max(X, axis=0) - np.min(X, axis=0))
+# Y = data[:, 11:14]  # (Nsamples, 3)
+# k_in = X.shape[1]
+# k_out = Y.shape[1]
 # sample_rate = 0.1
-# dt = sample_rate * np.ones((N, 1))  # (total_sample_nums, 1)
-# k_in = X[0].shape[1]
-# k_out = Y[0].shape[1]
+# dt = sample_rate * np.ones(
+#     (X.shape[0], 1)
+# )  # (Nsamples, 1) # In out version, assume sample rate is 0.1
 # logging(
-#     "Data has loaded, \nloaded subdatasets numbers,",
-#     file_counts,
-#     "\nX feature numbers:",
-#     k_in,
-#     "\nY feature numbers:",
-#     k_out,
-#     "\ntotal sample numbers:",
-#     N,
-#     "\nsample rate:",
-#     sample_rate,
+#     "loaded data, \nX",
+#     X.shape,
+#     "\nY",
+#     Y.shape,
+#     "\nt",
+#     t.shape,
+#     "\ndt",
+#     dt.shape,
+#     "\ntime intervals dt between %.3f and %.3f wide (%.3f on average)."
+#     % (np.min(dt), np.max(dt), np.mean(dt)),
 # )
+# N = X.shape[0]  # number of samples in total
 
 
-Ndev = int(frac_dev * N)
-Ntest = int(frac_test * N)
-Ntrain = N - Ntest - Ndev
+# ## Load data from the discrete dataset
+dataset_dir = "dataset"
+files_list = os.listdir(dataset_dir)
+file_counts = 0
+X: list = []  # (file_nums, sample_nums, feature_nums)
+Y: list = []  # (file_nums, sample_nums, feature_nums)
+t: list = []  # (file_nums, sample_nums, 1)
+sample_num_list: list = []  # (file_nums, 1)
+for file in files_list:
+    file_dir = dataset_dir + "/" + file
+    data = pd.read_csv(file_dir).to_numpy()
+    file_counts += 1
+    X.append(data[:, 1:11])  # (sample_nums, 10)
+    Y.append(data[:, 11:14])  # (sample_nums, 3)
+    t.append(data[:, 0])  # (sample_nums, 1)
+    sample_num_list.append(data.shape[0])  # (file_nums, 1)
+
+N = sum([subdataset_X.shape[0] for subdataset_X in X])
+sample_rate = 0.1
+sample_num_list: np.ndarray = np.array(sample_num_list)
+dt = sample_rate * np.ones((N, 1))  # (total_sample_nums, 1)
+k_in = X[0].shape[1]
+k_out = Y[0].shape[1]
+logging(
+    "Data has loaded, \nloaded subdatasets numbers,",
+    file_counts,
+    "\nX feature numbers:",
+    k_in,
+    "\nY feature numbers:",
+    k_out,
+    "\ntotal sample numbers:",
+    N,
+    "\nsample rate:",
+    sample_rate,
+    "\nsample nums of different csvs:",
+    sample_num_list,
+)
+
+
+Ndev_num_list = frac_dev * sample_num_list
+Ndev_num_list = Ndev_num_list.astype(int).tolist()
+Ntest_num_list = frac_test * sample_num_list
+Ntest_num_list = Ntest_num_list.astype(int).tolist()
+Ntrain_num_list = sample_num_list - Ndev_num_list - Ntest_num_list
 
 logging(
-    "first {} for training, then {} for development and {} for testing".format(
-        Ntrain, Ndev, Ntest
+    "Totally, there are {} samples for training, then {} samples for development and {} samples for testing".format(
+        np.sum(Ntrain_num_list), np.sum(Ndev_num_list), np.sum(Ntest_num_list)
     )
 )
+
+
+# Ndev = int(frac_dev * N)
+# Ntest = int(frac_test * N)
+# Ntrain = N - Ntest - Ndev
+
+# logging(
+#     "first {} for training, then {} for development and {} for testing".format(
+#         Ntrain, Ndev, Ntest
+#     )
+# )
 
 """
 evaluation function
@@ -257,7 +275,7 @@ RRSE error
 """
 
 
-def prediction_error(truth, prediction):
+def prediction_error(truth: np.ndarray, prediction: np.ndarray):
     assert (
         truth.shape == prediction.shape
     ), "Incompatible truth and prediction for calculating prediction error"
@@ -269,22 +287,53 @@ def prediction_error(truth, prediction):
     return 100 * rrse  # in percentage
 
 
-Xtrain = X[:Ntrain, :]
-dttrain = dt[:Ntrain, :]
-Ytrain = Y[1 : Ntrain + 1, :]
-ttrain = t[1 : Ntrain + 1, :]
+Xtrain: list = []
+Ytrain: list = []
+ttrain: list = []
+dttrain: list = []
 
-Xdev = X[Ntrain : Ntrain + Ndev, :]
-dtdev = dt[Ntrain : Ntrain + Ndev, :]
-Ydev = Y[Ntrain + 1 : Ntrain + Ndev + 1, :]
-tdev = t[Ntrain + 1 : Ntrain + Ndev + 1, :]
+Xdev: list = []
+Ydev: list = []
+tdev: list = []
+dtdev: list = []
 
-Xtest = X[Ntrain + Ndev : -1, :]
-dttest = dt[
-    Ntrain + Ndev : -1, :
-]  # last value was added artificially in data_processing.py, but is not used.
-Ytest = Y[Ntrain + Ndev + 1 :, :]
-ttest = t[Ntrain + Ndev + 1 :, :]
+Xtest: list = []
+Ytest: list = []
+ttest: list = []
+dttest: list = []
+
+for (i, Ndev), Ntrain in zip(enumerate(Ndev_num_list), Ntrain_num_list):
+    Xtrain.append(X[i][:Ntrain, :])
+    Ytrain.append(Y[i][1 : Ntrain + 1, :])
+    ttrain.append(t[i][1 : Ntrain + 1])
+    dttrain.append(dt[:Ntrain])
+
+    Xdev.append(X[i][Ntrain : Ntrain + Ndev, :])
+    Ydev.append(Y[i][Ntrain + 1 : Ntrain + Ndev + 1, :])
+    tdev.append(t[i][Ntrain + 1 : Ntrain + Ndev + 1])
+    dtdev.append(dt[Ntrain : Ntrain + Ndev])
+
+    Xtest.append(X[i][Ntrain + Ndev : -1, :])
+    Ytest.append(Y[i][Ntrain + Ndev + 1 :, :])
+    ttest.append(t[i][Ntrain + Ndev + 1 :])
+    dttest.append(dt[Ntrain + Ndev : -1])
+
+# Xtrain = X[:Ntrain, :]
+# dttrain = dt[:Ntrain, :]
+# Ytrain = Y[1 : Ntrain + 1, :]
+# ttrain = t[1 : Ntrain + 1, :]
+
+# Xdev = X[Ntrain : Ntrain + Ndev, :]
+# dtdev = dt[Ntrain : Ntrain + Ndev, :]
+# Ydev = Y[Ntrain + 1 : Ntrain + Ndev + 1, :]
+# tdev = t[Ntrain + 1 : Ntrain + Ndev + 1, :]
+
+# Xtest = X[Ntrain + Ndev : -1, :]
+# dttest = dt[
+#     Ntrain + Ndev : -1, :
+# ]  # last value was added artificially in data_processing.py, but is not used.
+# Ytest = Y[Ntrain + Ndev + 1 :, :]
+# ttest = t[Ntrain + Ndev + 1 :, :]
 
 
 """
@@ -299,25 +348,25 @@ ttest = t[Ntrain + Ndev + 1 :, :]
 
 # time_aware options
 
-if paras.time_aware == "input":
-    # expand X matrices with additional input feature, i.e., normalized duration dt to next sample
-    dt_mean, dt_std = np.mean(dttrain), np.std(dttrain)
-    dttrain_n = (dttrain - dt_mean) / dt_std
-    dtdev_n = (dtdev - dt_mean) / dt_std
-    dttest_n = (dttest - dt_mean) / dt_std
+# if paras.time_aware == "input":
+#     # expand X matrices with additional input feature, i.e., normalized duration dt to next sample
+#     dt_mean, dt_std = np.mean(dttrain), np.std(dttrain)
+#     dttrain_n = (dttrain - dt_mean) / dt_std
+#     dtdev_n = (dtdev - dt_mean) / dt_std
+#     dttest_n = (dttest - dt_mean) / dt_std
 
-    Xtrain = np.concatenate([Xtrain, dttrain_n], axis=1)
-    Xdev = np.concatenate([Xdev, dtdev_n], axis=1)
-    Xtest = np.concatenate([Xtest, dttest_n], axis=1)
+#     Xtrain = np.concatenate([Xtrain, dttrain_n], axis=1)
+#     Xdev = np.concatenate([Xdev, dtdev_n], axis=1)
+#     Xtest = np.concatenate([Xtest, dttest_n], axis=1)
 
-    k_in += 1
+#     k_in += 1
 
-if paras.time_aware == "no" or paras.time_aware == "input":
-    # in case 'input': variable intervals already in input X;
-    # now set actual time intervals to 1 (else same effect as time_aware == 'variable')
-    dttrain = np.ones(dttrain.shape)
-    dtdev = np.ones(dtdev.shape)
-    dttest = np.ones(dttest.shape)
+# if paras.time_aware == "no" or paras.time_aware == "input":
+#     # in case 'input': variable intervals already in input X;
+#     # now set actual time intervals to 1 (else same effect as time_aware == 'variable')
+#     dttrain = np.ones(dttrain.shape)
+#     dtdev = np.ones(dtdev.shape)
+#     dttest = np.ones(dttest.shape)
 
 # set model:
 if paras.model == "GRU":
@@ -331,7 +380,7 @@ elif paras.model == "ARNNinc":
 else:
     raise NotImplementedError("unknown model type " + paras.model)
 
-dt_mean = np.mean(dttrain)
+dt_mean = np.mean(dttrain[0])
 model = MIMO(
     k_in,
     k_out,
